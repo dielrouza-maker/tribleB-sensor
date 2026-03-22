@@ -20,12 +20,25 @@
   <div id="alerts"></div>
 
   <script>
+    // Supabase config
     const SUPABASE_URL = "https://elivfvxqhjyyuowzerjz.supabase.co";
     const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsaXZmdnhxaGp5eXVvd3plcmp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzUyMTAsImV4cCI6MjA4OTQxMTIxMH0.ATMoPvOnSGpqbCHfN6Gt7nUaFJTDIxz1bwMxG68oLv4";
-
-    // ✅ FIXED (renamed)
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // Call serverless function to send Telegram
+    async function sendTelegram(location) {
+      try {
+        await fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ location })
+        });
+      } catch (err) {
+        console.error("Telegram error:", err);
+      }
+    }
+
+    // Fetch alerts from Supabase
     async function fetchAlerts() {
       const { data, error } = await supabaseClient
         .from('alerts')
@@ -52,15 +65,17 @@
       });
     }
 
-    // ✅ REAL-TIME LISTENER
+    // Real-time listener for new alerts
     supabaseClient
       .channel('alerts-channel')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'alerts' },
         payload => {
-          alert("🚨 New blockage detected at " + payload.new.location);
+          const location = payload.new.location;
+          alert("🚨 New blockage detected at " + location);
           fetchAlerts();
+          sendTelegram(location); // call serverless function
         }
       )
       .subscribe();
